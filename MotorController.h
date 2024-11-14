@@ -5,7 +5,7 @@
 
 // Constants
 const int PULSES_PER_REVOLUTION = 14; //PPR of motor encoder: https://www.revrobotics.com/rev-21-1651/
-const int ENCODER_RPM_INTERVAL = 50; //Interval at which the RPM is calculated from pulses
+const unsigned long STOP_TIMEOUT = 100000; // Timeout for detecting stopped motor in microseconds (100 ms)
 
 class MotorController {
 private:
@@ -13,22 +13,23 @@ private:
     Servo esc;
     
     // Encoder Variables
-    static volatile long pulseCount;
-    unsigned long lastUpdateTime = 0;
-    float rpm = 0;
-    
+    static volatile unsigned long lastPulseTime;
+    static volatile float rpm;
+
     // Motor State
     int currentPower = 0;
     bool overrideMode = false;
     int overridePower = 0;
     bool locked = false;
 
-    static void countPulse() {
-      if (digitalRead(2) == digitalRead(3)) {
-          pulseCount++;
-      } else {
-          pulseCount--;
-      }
+    static void timePulseISR() {
+        unsigned long currentPulseTime = micros();
+        if (lastPulseTime > 0) {
+            // Calculate time difference in microseconds
+            unsigned long timeDiff = currentPulseTime - lastPulseTime;
+            rpm = (60000000.0 / timeDiff) / PULSES_PER_REVOLUTION;
+        }
+        lastPulseTime = currentPulseTime;
     }
 
 public:
@@ -37,43 +38,41 @@ public:
         esc.attach(9, 1000, 2000);  // Motor ESC PWM range
         pinMode(2, INPUT_PULLUP);
         pinMode(3, INPUT_PULLUP);
-        attachInterrupt(digitalPinToInterrupt(2), MotorController::countPulse, CHANGE);
+        attachInterrupt(digitalPinToInterrupt(2), MotorController::timePulseISR, CHANGE);
     }
 
     bool setPowerFromInput(int analogValue) {
-      return setPower(map(analogValue, 0, 1023, 1000, 2000));
+        return setPower(map(analogValue, 0, 1023, 1000, 2000));
     }
 
     bool setPower(int microseconds) {
-      bool successful = true;
+        bool successful = true;
 
-      currentPower = microseconds;
+        currentPower = microseconds;
 
-      // If the speed is locked or overidded, ignore the set power
-      if (locked)
-      {
-        currentPower = 1000;
-        successful = false;
-      }
-      else if (overrideMode) {
-        currentPower = overridePower;
-        successful = false;
-      }
+        // If the speed is locked or overridden, ignore the set power
+        if (locked) {
+            currentPower = 1000;
+            successful = false;
+        } else if (overrideMode) {
+            currentPower = overridePower;
+            successful = false;
+        }
 
-      esc.writeMicroseconds(currentPower);
-      return successful;
+        esc.writeMicroseconds(currentPower);
+        return successful;
     }
 
     void lock() {
-      locked = true;
+        locked = true;
     }
 
     void unlock() {
-      locked = false;
+        locked = false;
     }
 
     bool isLocked() const { 
-      return locked; 
+        return locked; 
     }
 
     void setOverrideMode(bool enable, int power) {
@@ -85,22 +84,17 @@ public:
         return currentPower; 
     }
 
-    void updateRPM() {
-        unsigned long currentTime = millis();
-        if (currentTime - lastUpdateTime >= ENCODER_RPM_INTERVAL) {
-            noInterrupts();
-            rpm = (pulseCount / static_cast<float>(PULSES_PER_REVOLUTION)) * (60.0/ENCODER_RPM_INTERVAL) * 1000;
-            pulseCount = 0;
-            lastUpdateTime = currentTime;
-            interrupts();
+    float getRPM() const {
+        // Check for timeout to detect stopped motor
+        if (micros() - lastPulseTime > STOP_TIMEOUT) {
+            return 0.0;  // No pulse detected recently, motor is stopped
         }
-    }
-
-    float getRPM() const { 
         return rpm;
     }
 };
 
-volatile long MotorController::pulseCount = 0;
+// Initialize static variables
+volatile unsigned long MotorController::lastPulseTime = 0;
+volatile float MotorController::rpm = 0;
 
 #endif

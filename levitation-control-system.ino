@@ -26,7 +26,6 @@ void loop() {
     ioHandler.checkInput(motorController);
 
     sensors.updateAll();
-    motorController.updateRPM();
 
     // Control motor speed based on potentiometer
     motorController.setPowerFromInput(sensors.getPotentiometerValue());
