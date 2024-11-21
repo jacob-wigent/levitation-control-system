@@ -23,7 +23,7 @@ void setup() {
 void loop() {
     unsigned long currentTime = millis();
 
-    ioHandler.checkInput(motorController);
+    ioHandler.checkInput(motorController, sensors);
 
     sensors.updateAll();
 

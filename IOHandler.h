@@ -13,7 +13,7 @@ public:
         Serial.begin(BAUD_RATE);
     }
 
-    void checkInput(MotorController& motorController) {
+    void checkInput(MotorController& motorController, Sensors& sensors) {
         if (Serial.available() > 0) {
             String input = Serial.readStringUntil('\n');
             input.trim();
@@ -25,9 +25,12 @@ public:
             } else if (input == "unlock") {
                 motorController.unlock();
             } else {
-                int speed = input.toInt();
-                if (speed >= 1000 && speed <= 2000) {
-                    motorController.setOverrideMode(true, speed);
+                float value = input.toFloat();
+                if (value >= 1000 && value <= 2000) {
+                    motorController.setOverrideMode(true, (int)value);
+                }
+                else if (value > 0 && value < 100) {
+                    sensors.setHeightOverride(value);
                 }
             }
         }
@@ -78,6 +81,30 @@ public:
         Serial.print(",");
         Serial.println(stable);
     }
+
+    //12.5
+    void sendDataCSV(const MotorController& motorController, const Sensors& sensors, float heightOverride) const {
+        unsigned long timestamp = millis();
+        int powerPercentage = mapValueToPercentage(motorController.getCurrentPower(), /*OLD 1270*/1094, 2000);
+        int pwmMicroseconds = motorController.getCurrentPower();
+        float rotorSpeed = motorController.getRPM();
+        float force = sensors.getForceValue();
+        float height = heightOverride;
+
+        // Print data as CSV
+        Serial.print(timestamp);         // Timestamp (ms)
+        Serial.print(",");              
+        Serial.print(powerPercentage);   // Power (%)
+        Serial.print(",");              
+        Serial.print(pwmMicroseconds);   // PWM Microseconds (us)
+        Serial.print(",");              
+        Serial.print(rotorSpeed);        // Rotor Speed (RPM)
+        Serial.print(",");              
+        Serial.print(force);             // Force (N)
+        Serial.print(",");              
+        Serial.println(height);          // Height (mm)
+    }
+
 
 private:
     float mapValueToPercentage(float value, float inputMin, float inputMax) const {

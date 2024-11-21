@@ -28,6 +28,8 @@ private:
   bool previousButtonState = 1;
   int initialDistance = 0;
 
+  float heightOverride;
+  bool heightOverrided = false;
 
   // Median Filter
   int distanceBuffer[MEDIAN_FILTER_SIZE];
@@ -60,7 +62,7 @@ public:
   }
 
   int getHeightValue() const {
-    return heightValue;
+    return heightOverrided ? heightOverride : heightValue;
   }
 
   float getForceValue() const {
@@ -94,6 +96,11 @@ public:
     float rawValue = analogRead(FORCE_PIN);
     float voltage = rawValue / 1023.0 * 5.0;
     return FORCE_SLOPE * voltage + FORCE_INTERCEPT;
+  }
+  
+  void setHeightOverride(float height) {
+    heightOverrided = true;
+    heightOverride = height;
   }
 
 private:
