@@ -61,7 +61,7 @@ public:
     return potentiometerValue;
   }
 
-  int getHeightValue() const {
+  float getHeightValue() const {
     return heightOverrided ? heightOverride : heightValue;
   }
 
